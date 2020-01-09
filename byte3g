@@ -1,5 +1,10 @@
 from sklearn.externals import joblib
 
+def train():
+    x=1
+def detect():
+    x=1
+
 if __name__ == '__main__':
     test_classifications=[]
     test_set=[]

@@ -9,7 +9,14 @@ import pickle
 
 
 def get3chars_list(s):
-    '''s - string, return lst of 3 chars'''
+    """
+          Return list of all the 3-grams in s.
+
+          :param s: a unicode string to split to 3 grams
+          :type s: unicode string
+
+          :rtype: a list of unicode strings.
+              """
     trio_list = []
     for i in range(0, len(s) - 2):
         trio_list.append(s[i] + s[i + 1] + s[i + 2])
@@ -75,7 +82,7 @@ if __name__=='__main__':
             if key not in trio_freq:
                 trio_freq[key]=0
             trio_freq[key] += apk_trio_freq[key]
-            
+
     max_trio=max_trio_freq(trio_freq,30)
     training_set={0:max_trio}
     for f_path in path_dict:

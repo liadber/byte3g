@@ -13,10 +13,17 @@ def get3chars_list(s):
     trio_list = []
     for i in range(0, len(s) - 2):
         trio_list.append(s[i] + s[i + 1] + s[i + 2])
-    return trio_list
+    return dict(trio_list)
 
 def get_dex_3byte_grams(apk):
-    '''apk - APK file, return dictionary (3 chars,frequency)'''
+    """
+           Return dictionary (key: 3-bytes-gram in dex of the given apk, value: this gram's frequency in dex of the given apk)
+
+           :param apk: apk file
+           :type apk: APK
+
+           :rtype: a dictionary of {(key: unicode, value: int)
+           """
     dex = dvm.DalvikVMFormat(apk.get_dex())
     dex_strings = dex.get_strings()
     trio_freq = {}  # key: trio, value: frequency

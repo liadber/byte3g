@@ -1,0 +1,110 @@
+import os
+
+from androguard.core.bytecodes import apk
+from androguard.core.bytecodes import dvm
+from sklearn import tree
+from sklearn.externals import joblib
+from sklearn.model_selection import cross_val_score
+import pickle
+
+
+def get3chars_list(s):
+    '''s - string, return lst of 3 chars'''
+    trio_list = []
+    for i in range(0, len(s) - 2):
+        trio_list.append(s[i] + s[i + 1] + s[i + 2])
+    return trio_list
+
+def get_dex_3byte_grams(apk):
+    '''apk - APK file, return dictionary (3 chars,frequency)'''
+    dex = dvm.DalvikVMFormat(apk.get_dex())
+    dex_strings = dex.get_strings()
+    trio_freq = {}  # key: trio, value: frequency
+    remainder = u''
+    for i in range(0, len(dex_strings)):
+        trio_list = get3chars_list(remainder + dex_strings[i])
+        remainder = dex_strings[i][-2:]
+        for trio in trio_list:
+            if trio_freq.get(trio) != None:
+                trio_freq[trio] += 1
+            else:
+                trio_freq[trio] = 0
+    return trio_freq
+
+def max_trio_freq(trio_freq,amount):
+    max_trio=[]
+    for i in range(0, amount):
+        max=0
+        argmax=u''
+        for trio in trio_freq:
+            if trio_freq[trio]>max:
+                max= trio_freq[trio]
+                argmax=trio
+        max_trio.append(argmax)
+        del trio_freq[argmax]
+    return max_trio
+
+def write_to_mem(clf):
+    '''.
+
+Python Version. Take note of the python version. You almost certainly require the same major (and maybe minor) version of Python used to serialize the model when you later load it and deserialize it.
+Library Versions. The version of all major libraries used in your machine learning project almost certainly need to be the same when deserializing a saved model. This is not limited to the version of NumPy and the version of scikit-learn.
+Manual Serialization. You might like to manually output the parameters of your learned model so that you can use them directly in scikit-learn or another platform in the future. Often the algorithms used by machine learning algorithms to make predictions are a lot simpler than those used to learn the parameters can may be easy to implement in custom code that you have control over.'''
+    #https://machinelearningmastery.com/save-load-machine-learning-models-python-scikit-learn/
+    file_name='finalized_model.sav'
+    joblib.dump(clf,file_name)
+
+files = os.listdir("./files")
+trio_freq = {} #the whole dictionary of trio_frquency for all the files.
+path_dict={}
+for f_path in files:
+    try:
+        apk_trio_freq= get_dex_3byte_grams(apk.APK("files/"+f_path)) #dictionary of specific this apk file.
+        path_dict[f_path]=apk_trio_freq
+    except:
+        print("aaaaaaaaaaaaaaaaaaaaaaa: "+ f_path)
+    for key in apk_trio_freq:
+        if key not in trio_freq:
+            trio_freq[key]=0
+        trio_freq[key]+=apk_trio_freq[key]
+max_trio=max_trio_freq(trio_freq,30)
+training_set={0:max_trio}
+for f_path in path_dict:
+    record =[]
+    for trio in max_trio:
+        if trio in path_dict[f_path]:
+            record.append(1)
+        else:
+            record.append(0)
+    training_set[f_path]=record
+training_classifications=[]
+r=0
+for f_path in training_set:
+    if r%2==0:
+        training_classifications[f_path]=1
+    else:
+        training_classifications[f_path]=0
+    r=r+1
+clf = tree.DecisionTreeClassifier()
+clf = clf.fit(training_set,training_classifications)
+scores= cross_val_score(clf,training_set,training_classifications,cv=10)
+write_to_mem(clf)
+print(clf)
+
+
+
+'''C:\Users\liadb\PycharmProjects\byte3g\venv\Scripts\python.exe C:/Users/liadb/PycharmProjects/byte3g/DexReader
+aaaaaaaaaaaaaaaaaaaaaaa: 05ccede1d305cb8e56178f8ca5cb92c2275246b7a712c706aabd69a7e51e861a.apk
+aaaaaaaaaaaaaaaaaaaaaaa: 06a7890a4cc68d432cea2d550757e90b974b9dcfa16d9094c889f5859e7b6ac5.apk
+aaaaaaaaaaaaaaaaaaaaaaa: 07426afd1755c1db1e737f345b0b0ccd4b32a5e86ae6fafe2acd225f1c686bb1.apk
+aaaaaaaaaaaaaaaaaaaaaaa: 0802f172bfcd6eee35badcbb389b6ef208945f7d966b08d5f9a01424e183cc9d.apk
+No handlers could be found for logger "androguard.core.api_specific_resources"
+aaaaaaaaaaaaaaaaaaaaaaa: 0ae769d7d82fb86b81076aa7a7f3f2b794e968c3cf2bc75b38eea625834f8329.apk
+aaaaaaaaaaaaaaaaaaaaaaa: 0db85edecb9d0a615bf00df4e0298045873f582360c3826a1e0618ac12f6bd1b.apk
+aaaaaaaaaaaaaaaaaaaaaaa: 0f9efff87d9c4d38c454eb4583bb1f45e65616ad8a049c9cf8600e0f8704e0f4.apk
+aaaaaaaaaaaaaaaaaaaaaaa: 10409d86e44c1495902736eacd09e669550af2d9ec33b8dd7f7a83db3714fb4b.apk
+aaaaaaaaaaaaaaaaaaaaaaa: 125358564fdedf675613b99233c8e8d8214f6187f94c18a733d040b80d39ebfb.apk
+aaaaaaaaaaaaaaaaaaaaaaa: 12f7f614391904bf6e55fdd78423850c6f71a0b86e05536568b111b89fbf9ba1.apk
+aaaaaaaaaaaaaaaaaaaaaaa: 141f865447bc4fcb3921916b5f675f08277734b1137124ddf88d325d341513f1.apk
+{0: [u'and', u'dro', u'oid', u'ndr', u'roi', u'id/', u'ion', u'com', u'tio', u'ent', u'get', u'om/', u'Lco', u'ter', u'nte', u';Lc', u'Lan', u';La', u'gle', u'ing', u'iew', u'ogl', u'oog', u'/an', u'le/', u'goo', u'ort', u'ate', u'set', u'e/a'], '04d965da37f20642ffebf0460443e61cebc5e6c88e05ee49ad0804f2c05b9370.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '0db140af52770161d0121baebc0e1e2574418ac19f1c94338c37599f59f4f2a5.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '08d82ed84ae3c077df6069456699c4961aefb64015fc947162804ce1576f734b.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '0c9d6d972785daaa04c494e4c02b51038006f792ffdd99cadff1c49fc97efc40.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '07d5914803af4f60b54faf9749a78ab8d9cc617a6c53e69628896a04e8671fff.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '13092224ad6eb2239bb150b571a499a119fd5584d53debd820b82b9de8e4ee60.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0], '0f3d203782b59966fad03e609c638ac862f785c416690c0bb474289b903657be.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1], '0eacfcdf733e8615c70a6b185f28258a5073b8b82beed221a19d3e2142ae1d70.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '0a6c881c1425b20e8e6d89a47cf89342912054b59dafd3546d2d7f23e421b07e.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '0eda86cdebc6ab27a8a382b08cb44b74224330a12e87d9790742b5793ee05cb0.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0], '11645d39fe2b6a44e804a8df5c187818d42afd42d464f3c82d7390f30d2a47f9.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '0f5023ffac92966a425243bb18995e44a01d0dcb52d65892c17ca6ccb7ca87a3.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0], '07b8d8c842b9b2d3ee28838e6656f0ad2c4793854a3e42288ba4f6032498eea3.apk': [1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0], '089f4289332e0ce7df729e44b0e02d13da68de9029705148d8d515feace83a9c.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '0261b29e6ce7dc2b1afdb13c014d5feeec4a9913a44f6468bf88059e52d22923.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '10d206d982e3a085d9bc7c33c965da17f7ae8e46e13f7e6149196b493b9d467f.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '0c418926686130178c13758ad95fa404fd75e16248949102cf903169fecd77a8.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1], '12e79ec7580a893f19489046ff35fbb1dfb5dea2d28dd871cca947d464b62205.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '11a564207edeb4879a2f013394386fb1edd052331af3480aa40c14322e3522d2.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '0af1aaa399a267df9e065bf68180ecd9684ad7f53a3c60e7c98ffe212e2fe0c3.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '08417573d2aabad040e496ff5b3ec128c189199fdf2b197fcb3fd7b327191207.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '06f6eee5b15d86e03bab3f4fcc3a17661859345fedb97a29ab083110e5a813f4.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '0aa5ea17c43a4248d32964022dfdb05e824225e2bf0c4f46e220577c23a71f53.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0], '0d4c552ce05cee7fb16697a6448c0530780d6b0c054fbb7c1a8e088e633aa5aa.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '090e2b8548365a6cce22742352494e6b9b21082b3f29b468d4439db17d19077e.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '0fa14818cde3735b33a4f1908243767b35754dbdbeb9d3eddb70bf8d9e08416f.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '01175780898983b0a2fb8a6f48c44714a93b84c1d6c48f27f47a427c5d79275c.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1], '14810d9dc064b8a206599bfc02351433b043df931d2b710cb92664e91748ec14.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '1459bb3caaa3a9a9d7b4bccfb205402a6c0c17c39efaf5f0e26ae9af5288cfef.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '09f867aeda043292566b8dc590857d461b2ffd5f5078218a05acde790e40bef9.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '00a9e196d29e3349f62fb38cefaa1a94458a51e2d4de1961bf69edbe60fe890f.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '132fecac176b77b5fc881be0c7f14c0b7d93cfe04e00efc0cb8459aec6b64ece.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0], '130362bcb8f56f593517995e4c0bcab3e1c5038b31046d180a68d593b4c5b36d.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '07884b7ef0706246ce121c44cdf72438b6bc15887be069b0b733a71568e1265a.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '0bde96c0188d5406d7e2863eaa68f562f797e22b4f49d5b12d9387746cdbb1d7.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '0b4b04dfa22af336c6ca4ade7c8af9932d0337bd0ff543cc6698132aff81d3af.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0], '07dca5453211bb81a6843a15b2016c73632c51986aadea45ff3eaa199b4411bc.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '0f8e802a7aa03c0992a7f873ce606075fe29fa0f2e909518bdf91ee6c4081fbb.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0], '078e6d2bbf2f4ebf4fcedd9ef9b1eaf9e87fb02834bf209c572883c4e4cfad97.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '0190d5ca9a164c02c512ad1dac1cd5ca0f8f703f74954fa49099871431a711e3.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0], '044221c0d9284d9663f92890ecd36416b1c174c58486c1094de5d9dd6d7f7f5e.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '0a3c1b27b5bc0c4746445eb1c068eee98079ae26b94770797bf219e9d8564fef.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '14e62bc590abcfb12e5983a941120a623fade5cc09d1712049d443d7e2b3a039.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '12a75a9e8cf3f0ec381977963ebc70f02488c37b2cfa741598649e70c6ea99b1.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1], '068b72bfa99c357d554c69f9bb0e2c4ebd8377a0a395da25b01a7cca52291fef.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '133f3bcf50bf2da8d81bddaafc7d56bf77bd115f50c47e90ba010741842398ee.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '0a1695fd20ea5adf1ef8cb466b8f0fee7f9bfcf9b8e9abb67a1c5ad6d2f33854.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '02740b98827c8b9be3c6ce3a5d6710b8ce00f7f139e4dcb80b95497e7f07532f.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0], '05929b95c894bf17f309cf5b4f53f257a5c0a7c608570fa22208f78a992bb7f2.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '0538b9a1c028cd704bb93e711a0eb06ec606e7fb6cc335e5b41d8943a3512939.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '07e280357fd5ece8eef52de51b20c32f97a5e9f369de86e2ea03409defbb2082.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0], '1410a3d6f2f44ce7c00125e55756a7aca27d04500019a5e57e1cbf32e686ebcc.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '03c16510bba6423ea146570f54032d3f3ac2287122b1565072bf43c8ae61c286.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '0f3e65c009903baab59f08994f5c7eafa4f773d0070cecfcf6682820fa5e66a7.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0], '11fb7c33744d3e246cbf46bb89e9c6b3eb665d9cf7f3d0654cc6bdee4832d5bb.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0], '0843f69a305579c25d857a8a0811ce7982d7f7f6318f66228402359316648b01.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1], '102de69e1aecd4c4fe6a0076bd8a14a757ce60c2a1ed6c9a646161b345daca59.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '06e97bff17cd040a0192434492361b4d15e6937f3828f2b513d06e2633cd8e4e.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], '0abffb7d571f6ba9c66187ad63ecd960b8aac340c8cefa7d3163bda5db646d63.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1], '144da8b5ded2888a00bb5576e8cfaf4adf55d63688bfba9f248f4d7da0714a98.apk': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]}
+'''

@@ -1,0 +1,7 @@
+from sklearn.externals import joblib
+
+test_classifications=[]
+test_set=[]
+loaded_model= joblib.load('finalized_model.sav')
+result=loaded_model.score(test_set,test_classifications)
+print(result)

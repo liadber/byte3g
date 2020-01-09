@@ -52,44 +52,45 @@ Library Versions. The version of all major libraries used in your machine learni
 Manual Serialization. You might like to manually output the parameters of your learned model so that you can use them directly in scikit-learn or another platform in the future. Often the algorithms used by machine learning algorithms to make predictions are a lot simpler than those used to learn the parameters can may be easy to implement in custom code that you have control over.'''
     #https://machinelearningmastery.com/save-load-machine-learning-models-python-scikit-learn/
     file_name='finalized_model.sav'
-    joblib.dump(clf,file_name)
+    joblib.dump(clf, file_name)
 
-files = os.listdir("./files")
-trio_freq = {} #the whole dictionary of trio_frquency for all the files.
-path_dict={}
-for f_path in files:
-    try:
-        apk_trio_freq= get_dex_3byte_grams(apk.APK("files/"+f_path)) #dictionary of specific this apk file.
-        path_dict[f_path]=apk_trio_freq
-    except:
-        print("aaaaaaaaaaaaaaaaaaaaaaa: "+ f_path)
-    for key in apk_trio_freq:
-        if key not in trio_freq:
-            trio_freq[key]=0
-        trio_freq[key]+=apk_trio_freq[key]
-max_trio=max_trio_freq(trio_freq,30)
-training_set={0:max_trio}
-for f_path in path_dict:
-    record =[]
-    for trio in max_trio:
-        if trio in path_dict[f_path]:
-            record.append(1)
+if __name__=='__main__':
+    files = os.listdir("./files")
+    trio_freq = {} #the whole dictionary of trio_frquency for all the files.
+    path_dict={}
+    for f_path in files:
+        try:
+            apk_trio_freq= get_dex_3byte_grams(apk.APK("files/"+f_path)) #dictionary of specific this apk file.
+            path_dict[f_path]=apk_trio_freq
+        except:
+            print("aaaaaaaaaaaaaaaaaaaaaaa: "+ f_path)
+        for key in apk_trio_freq:
+            if key not in trio_freq:
+                trio_freq[key]=0
+            trio_freq[key] += apk_trio_freq[key]
+    max_trio=max_trio_freq(trio_freq,30)
+    training_set={0:max_trio}
+    for f_path in path_dict:
+        record =[]
+        for trio in max_trio:
+            if trio in path_dict[f_path]:
+                record.append(1)
+            else:
+                record.append(0)
+        training_set[f_path]=record
+    training_classifications=[]
+    r=0
+    for f_path in training_set:
+        if r%2==0:
+            training_classifications[f_path]=1
         else:
-            record.append(0)
-    training_set[f_path]=record
-training_classifications=[]
-r=0
-for f_path in training_set:
-    if r%2==0:
-        training_classifications[f_path]=1
-    else:
-        training_classifications[f_path]=0
-    r=r+1
-clf = tree.DecisionTreeClassifier()
-clf = clf.fit(training_set,training_classifications)
-scores= cross_val_score(clf,training_set,training_classifications,cv=10)
-write_to_mem(clf)
-print(clf)
+            training_classifications[f_path]=0
+        r=r+1
+    clf = tree.DecisionTreeClassifier()
+    clf = clf.fit(training_set,training_classifications)
+    scores= cross_val_score(clf, training_set, training_classifications, cv=10)
+    write_to_mem(clf)
+    print(clf)
 
 
 

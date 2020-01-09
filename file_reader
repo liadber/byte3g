@@ -70,11 +70,12 @@ if __name__=='__main__':
             apk_trio_freq= get_dex_3byte_grams(apk.APK("files/"+f_path)) #dictionary of specific this apk file.
             path_dict[f_path]=apk_trio_freq
         except:
-            print("aaaaaaaaaaaaaaaaaaaaaaa: "+ f_path)
+            print("Problematic Mainfest: "+ f_path)
         for key in apk_trio_freq:
             if key not in trio_freq:
                 trio_freq[key]=0
             trio_freq[key] += apk_trio_freq[key]
+            
     max_trio=max_trio_freq(trio_freq,30)
     training_set={0:max_trio}
     for f_path in path_dict:
